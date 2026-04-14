@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>GestEdu · ITM Saint Gabriel</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Roboto, system-ui, sans-serif; }
+        body { background: #f0f7ff; margin: 0; padding: 20px; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .connection-status { position: fixed; top: 10px; right: 10px; z-index: 9999; background: white; padding: 8px 16px; border-radius: 40px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; align-items: center; gap: 10px; font-size: 0.85rem; font-weight: 600; }
+        .led { width: 12px; height: 12px; border-radius: 50%; background-color: #2ecc71; box-shadow: 0 0 5px #2ecc71; }
+        /* Splash screen */
+        .splash-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; display: flex; align-items: center; justify-content: center; z-index: 1000; transition: opacity 0.5s; }
+        .splash-content { text-align: center; color: #1e3c72; padding: 20px; }
+        .splash-itm { font-size: 8rem; font-weight: 900; color: #ff3333; line-height: 1; margin-bottom: 0; text-shadow: 4px 4px 0 #e2edf7; }
+        .splash-saintgabriel { font-size: 4rem; font-weight: 700; color: #ff3333; line-height: 1.2; margin-top: -10px; text-shadow: 2px 2px 0 #e2edf7; }
+        .splash-sub { font-size: 2rem; font-weight: 600; margin: 10px 0; color: #2c5282; }
+        .splash-apk { margin-top: 40px; font-size: 1.2rem; font-weight: 500; color: #4a5568; }
+        .enter-btn { background: #f9c74f; border: none; padding: 15px 40px; font-size: 1.3rem; font-weight: bold; color: #1e3c72; border-radius: 50px; cursor: pointer; margin-top: 30px; }
+        .loader-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10,43,68,0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 2000; opacity: 0; visibility: hidden; transition: 0.3s; color: white; }
+        .loader-overlay.active { opacity: 1; visibility: visible; }
+        .engine { width: 80px; height: 80px; border: 4px solid rgba(249,199,79,0.3); border-top-color: #f9c74f; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px; }
+        .loader-text { font-size: 1.5rem; font-weight: 500; color: #f9c74f; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Application container */
+        .app-container { max-width: 1400px; margin: 0 auto; background: white; border-radius: 32px; box-shadow: 0 20px 35px -12px rgba(0,0,0,0.15); overflow: hidden; display: none; }
+        /* Header fixe */
+        .main-header { background: #2c5282; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; position: sticky; top: 0; z-index: 100; border-radius: 32px 32px 0 0; }
+        .main-header h2 { color: white; margin: 0; font-size: 1.2rem; }
+        .main-header h2 span { color: #ff3333; }
+        .exit-btn { background: #c44c4c; color: white; border: none; padding: 10px 24px; font-weight: bold; border-radius: 40px; cursor: pointer; }
+        /* Onglets attachés directement sous le header */
+        .sub-tabs { display: flex; gap: 8px; margin: 0; padding: 8px 24px; background: white; border-bottom: 2px solid #e2edf7; flex-wrap: wrap; position: sticky; top: 70px; z-index: 90; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        .sub-tab-btn { background: none; border: none; padding: 8px 20px; font-weight: 600; cursor: pointer; color: #4a5568; border-radius: 40px; }
+        .sub-tab-btn.active { background: #1e3c72; color: white; }
+        .panels { padding: 20px 24px; max-height: calc(100vh - 130px); overflow-y: auto; }
+        .sub-panel { display: none; }
+        .sub-panel.active-sub { display: block; }
+        .card { background: #f8fafc; border-radius: 24px; padding: 20px; margin-bottom: 28px; border: 1px solid #e2edf7; }
+        .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
+        input, select, textarea, button { border-radius: 40px; padding: 10px 16px; border: 1px solid #cbd5e1; font-size: 0.9rem; }
+        button { background: #1e3c72; color: white; border: none; font-weight: 600; cursor: pointer; }
+        button:hover { opacity: 0.85; }
+        .btn-success { background: #2e7d32; }
+        .btn-warning { background: #e67e22; }
+        .btn-danger { background: #c44c4c; }
+        .btn-secondary { background: #4b6f8e; }
+        .btn-print { background: #6c5ce7; }
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 16px; margin-top: 15px; }
+        th, td { padding: 12px 8px; border: 1px solid #ddd; text-align: left; }
+        th { background: #1e3c72; color: white; }
+        .badge { background: #e2edf7; padding: 4px 12px; border-radius: 40px; display: inline-block; margin: 3px; }
+        .flex-between { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 15px; }
+        .class-group { margin-bottom: 30px; border: 1px solid #e2edf7; border-radius: 16px; overflow: hidden; }
+        .class-header { background: #1e3c72; color: white; padding: 12px 16px; font-weight: bold; display: flex; justify-content: space-between; }
+        .param-row { background: #eef2ff; padding: 15px; border-radius: 20px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 15px; align-items: center; }
+        .modal-bulletin { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 3000; backdrop-filter: blur(4px); }
+        .modal-bulletin-content { background: white; border-radius: 28px; max-width: 650px; width: 90%; padding: 20px; }
+        .bulletin-card { background: #fff9ef; padding: 20px; border-radius: 20px; border: 1px solid #f1c40f; }
+        .bulletin-card h2, .bulletin-card h3 { text-align: center; margin: 5px 0; }
+        .professional-report { background: white; border-radius: 20px; padding: 25px; border: 1px solid #cbd5e1; white-space: pre-wrap; font-family: 'Segoe UI', monospace; }
+        .camera-container { display: flex; flex-direction: column; align-items: center; gap: 10px; margin: 15px 0; }
+        .camera-preview { width: 100%; max-width: 320px; border-radius: 20px; border: 2px solid #1e3c72; background: #000; }
+        .photo-thumb { width: 80px; height: 80px; object-fit: cover; border-radius: 50%; border: 2px solid #1e3c72; }
+        .password-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 5000; }
+        .password-box { background: white; padding: 30px; border-radius: 32px; max-width: 400px; width: 90%; text-align: center; }
+        @media print { .no-print, .modal-bulletin-content button { display: none; } }
+    </style>
+</head>
+<body>
+<div class="connection-status"><div class="led"></div><span>Sauvegarde auto ✓</span></div>
+<!-- Splash Screen modifiée -->
+<div class="splash-screen" id="splashScreen">
+    <div class="splash-content">
+        <div class="splash-itm">ITM</div>
+        <div class="splash-saintgabriel">SAINT GABRIEL</div>
+        <div class="splash-sub">GESTION COMPTABLE</div>
+        <div class="splash-apk">APK BY Ir. STEVES ILUNGA</div>
+        <button class="enter-btn" id="enterAppBtn">ACCÉDER</button>
+    </div>
+</div>
+<!-- Loader avec nouveau texte -->
+<div class="loader-overlay" id="loaderOverlay">
+    <div class="engine"></div>
+    <div class="loader-text">Veuillez patienter svp</div>
+</div>
+
+<div class="app-container" id="appContainer">
+    <div class="main-header">
+        <h2>💰 GESTION COMPTABLE · <span>ITM SAINT GABRIEL</span></h2>
+        <button class="exit-btn" id="exitAppBtn">EXIT</button>
+    </div>
+    <!-- Onglets déplacés ici pour être collés au header -->
+    <div class="sub-tabs">
+        <button class="sub-tab-btn active" data-sub="compta-param">⚙️ Paramètres</button>
+        <button class="sub-tab-btn" data-sub="compta-eleves">📚 Listes Élèves</button>
+        <button class="sub-tab-btn" data-sub="compta-personnel">👥 Personnel</button>
+        <button class="sub-tab-btn" data-sub="compta-paiement-personnel">💵 Paiements personnel</button>
+        <button class="sub-tab-btn" data-sub="compta-paiement">💵 Paiements élèves</button>
+        <button class="sub-tab-btn" data-sub="compta-frais-speciaux">📌 Frais spécifiques</button>
+        <button class="sub-tab-btn" data-sub="compta-depenses">📦 Dépenses</button>
+        <button class="sub-tab-btn" data-sub="compta-rapport">📊 Rapport du jour</button>
+        <button class="sub-tab-btn" data-sub="compta-archives">📁 Archives & Rapports</button>
+    </div>
+    <div class="panels">
+        <!-- Tous les panneaux restent identiques -->
+        <!-- Paramètres -->
+        <div id="compta-param" class="sub-panel active-sub">
+            <div class="card"><h3>⚙️ Configuration</h3>
+                <div class="param-row"><label>💱 Taux USD → CDF</label><input type="number" id="exchangeRateInput" step="5" value="2500" style="width:150px"><button id="saveExchangeRateBtn" class="btn-success">Sauvegarder</button></div>
+                <div class="param-row"><label>💰 Frais annuels défaut (USD)</label><input type="number" id="defaultAnnualFees" step="10" value="350" style="width:150px"><button id="saveDefaultFeesBtn" class="btn-success">Appliquer</button></div>
+                <div class="param-row"><label>📱 WhatsApp Promoteur</label><input type="tel" id="globalPromoteurPhone" placeholder="+243XXXXXXXXX" style="width:250px"><button id="savePromoteurPhoneBtn" class="btn-success">Enregistrer</button><button id="testPromoteurMsgBtn" class="btn-secondary">Tester</button></div>
+                <div class="param-row"><label>📱 WhatsApp Financier Titulaire</label><input type="tel" id="globalFinancierPhone" placeholder="+243XXXXXXXXX" style="width:250px"><button id="saveFinancierPhoneBtn" class="btn-success">Enregistrer</button><button id="testFinancierMsgBtn" class="btn-secondary">Tester</button></div>
+                <div class="param-row"><label>🔐 Sécurité</label><button id="changePasswordBtn" class="btn-warning">Changer mot de passe</button></div>
+                <div class="alert" style="background:#e0f2fe; padding:12px; border-radius:20px;">✅ Sauvegarde automatique permanente.</div>
+            </div>
+        </div>
+
+        <!-- Listes Élèves -->
+        <div id="compta-eleves" class="sub-panel">
+            <div class="card">
+                <div class="flex-between"><h3>📋 Enregistrement élève</h3><button id="openAddStudentFormBtn" class="btn-success">➕ Nouvel élève</button></div>
+                <div id="studentFormContainer" style="display:none;" class="form-step">
+                    <h4>📝 Informations</h4>
+                    <div class="grid-2">
+                        <input type="text" id="studentName" placeholder="Nom complet *">
+                        <select id="studentSexe"><option value="M">Masculin</option><option value="F">Féminin</option></select>
+                        <select id="studentClass"><option value="">Sélectionner la classe</option></select>
+                        <input type="text" id="studentParentName" placeholder="Parent / tuteur">
+                        <input type="tel" id="studentParentPhone" placeholder="Téléphone parent">
+                        <input type="number" id="studentCustomFees" placeholder="Frais annuels (USD)" step="10">
+                    </div>
+                    <div class="camera-container">
+                        <video id="cameraPreview" class="camera-preview" autoplay playsinline></video>
+                        <canvas id="cameraCanvas" style="display:none;"></canvas>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
+                            <button type="button" id="startCameraBtn" class="btn-secondary">📷 Activer caméra</button>
+                            <button type="button" id="capturePhotoBtn" class="btn-success" disabled>📸 Prendre photo</button>
+                            <label class="btn-secondary" style="cursor:pointer;">📁 Choisir fichier <input type="file" id="photoFileInput" accept="image/*" style="display:none;"></label>
+                        </div>
+                        <div><img id="photoPreview" class="photo-thumb" src="" alt="Aperçu" style="display:none;"><input type="hidden" id="studentPhotoData"></div>
+                    </div>
+                    <div class="flex-between"><button id="saveStudentBtn" class="btn-success">💾 Enregistrer</button><button id="cancelStudentFormBtn" class="btn-secondary">Annuler</button></div>
+                </div>
+                <h3>📊 Tableau des élèves par niveau</h3>
+                <div id="groupedStudentList"></div>
+                <div id="totalGeneralEffectif" style="margin-top:20px; font-weight:bold; text-align:center; padding:10px; background:#e2edf7; border-radius:12px;"></div>
+                <button id="printAllClassesBtn" class="btn-print" style="margin-top:10px;">🖨️ Imprimer tout</button>
+            </div>
+        </div>
+
+        <!-- Personnel (deux tableaux) -->
+        <div id="compta-personnel" class="sub-panel">
+            <div class="card">
+                <div class="flex-between"><h3>👥 Personnel</h3><button id="openAddStaffBtn" class="btn-success">+ Ajouter</button><button id="printStaffListBtn" class="btn-print">🖨️ Imprimer</button></div>
+                <div id="addStaffForm" style="display:none;" class="grid-2">
+                    <input type="text" id="staffName" placeholder="Nom complet">
+                    <select id="staffType"><option value="admin">Administratif (USD)</option><option value="facilitateur">Facilitateur (CDF)</option></select>
+                    <input type="text" id="staffRole" placeholder="Fonction">
+                    <input type="tel" id="staffPhone" placeholder="Téléphone">
+                    <div id="staffSalaryField"><input type="number" id="staffSalary" placeholder="Salaire mensuel USD"></div>
+                    <div id="staffHourlyRateField" style="display:none;"><input type="number" id="staffHourlyRate" placeholder="Taux horaire CDF"></div>
+                    <button id="saveStaffBtn" class="btn-success">💾 Enregistrer</button>
+                    <button id="cancelStaffBtn" class="btn-secondary">Annuler</button>
+                </div>
+                <h4>📌 Personnel Administratif (USD)</h4>
+                <div id="adminStaffTable"></div>
+                <h4 style="margin-top:30px;">📌 Facilitateurs (CDF / heure)</h4>
+                <div id="facilitateurStaffTable"></div>
+            </div>
+        </div>
+
+        <!-- Paiements personnel (deux tableaux séparés) -->
+        <div id="compta-paiement-personnel" class="sub-panel">
+            <div class="card">
+                <div class="flex-between"><h3>💵 PAIEMENTS ADMINISTRATIFS (USD)</h3><button id="refreshAdminPayrollBtn" class="btn-secondary">⟳ Rafraîchir</button></div>
+                <div id="adminPayrollContainer"></div>
+                <div class="flex-between" style="margin-top:30px;"><h3>💵 PAIEMENTS FACILITATEURS (CDF)</h3><button id="refreshFacilitateurPayrollBtn" class="btn-secondary">⟳ Rafraîchir</button></div>
+                <div id="facilitateurPayrollContainer"></div>
+                <h4 style="margin-top:20px;">🗃️ Paiements archivés</h4>
+                <div id="archivedPayrollContainer"></div>
+                <button id="printPayrollListBtn" class="btn-print">🖨️ Imprimer liste</button>
+            </div>
+        </div>
+
+        <!-- Paiements élèves -->
+        <div id="compta-paiement" class="sub-panel">
+            <div class="card"><h3>💵 Encaissement</h3>
+                <div class="grid-2"><label>Classe</label><select id="paymentClassSelect"></select><label>Rechercher</label><input type="text" id="searchStudent" placeholder="Nom..."></div>
+                <select id="paymentStudentSelect" size="5" style="width:100%; height:120px;"></select>
+                <div class="grid-2">
+                    <select id="currencyType"><option value="USD">USD</option><option value="CDF">CDF</option></select>
+                    <input type="number" id="paymentAmountLocal" placeholder="Montant">
+                    <input type="date" id="paymentDate">
+                    <input type="text" id="paymentDesc" placeholder="Rubrique (ex: frais annuels)">
+                </div>
+                <div id="conversionPreview" class="badge"></div>
+                <div class="flex-between"><button id="recordPaymentBtn" class="btn-success">Enregistrer</button><button id="sendPaymentWhatsAppBtn" class="btn-secondary">📲 Confirmer parent</button><button id="printPaymentReceiptBtn" class="btn-secondary">🖨️ Reçu</button><button id="printPaymentsHistoryBtn" class="btn-print">📜 Imprimer historique</button></div>
+                <h3>📜 Historique paiements</h3><div id="paymentHistoryList"></div>
+            </div>
+        </div>
+
+        <!-- Frais spécifiques -->
+        <div id="compta-frais-speciaux" class="sub-panel">
+            <div class="card">
+                <h3>📌 Frais technique · Frais de stage · Autres frais</h3>
+                <div class="grid-2">
+                    <select id="specialFeeType"><option value="technique">Frais technique</option><option value="stage">Frais de stage</option><option value="autre">Autres frais</option></select>
+                    <select id="specialFeeStudentSelect"></select>
+                    <input type="number" id="specialFeeAmount" placeholder="Montant">
+                    <select id="specialFeeCurrency"><option value="USD">USD</option><option value="CDF">CDF</option></select>
+                    <input type="date" id="specialFeeDate">
+                    <input type="text" id="specialFeeDesc" placeholder="Description">
+                </div>
+                <button id="recordSpecialFeeBtn" class="btn-success">Enregistrer</button>
+                <h4>Historique</h4>
+                <div id="specialFeesHistory"></div>
+            </div>
+        </div>
+
+        <!-- Dépenses -->
+        <div id="compta-depenses" class="sub-panel">
+            <div class="card"><h3>🚛 Logistique</h3><div class="grid-2"><input type="text" id="logItem" placeholder="Article"><select id="logType"><option value="ENTREE">Entrée</option><option value="SORTIE">Sortie</option></select><input type="number" id="logQty" placeholder="Qté"><input type="number" id="logPrice" placeholder="Prix unit. USD"></div><button id="addLogBtn" class="btn-success">Ajouter</button><div id="logisticsList"></div><h3>📦 Stock</h3><div id="stockSummary"></div></div>
+            <div class="card"><h3>🚌 Transport</h3><div class="grid-2"><input type="text" id="transportName" placeholder="Nom"><select id="transportCurrency"><option value="USD">USD</option><option value="CDF">CDF</option></select><input type="number" id="transportAmount" placeholder="Montant"><input type="date" id="transportDate"></div><button id="addTransportBtn" class="btn-success">Ajouter</button><div id="transportList"></div><div>Total: <strong id="totalTransports">0</strong> USD</div></div>
+            <div class="card"><h3>💰 Autres dépenses</h3><div class="grid-2"><input type="text" id="expenseMotif" placeholder="Motif"><select id="expenseCurrency"><option value="USD">USD</option><option value="CDF">CDF</option></select><input type="number" id="expenseAmount" placeholder="Montant"><input type="date" id="expenseDate"></div><button id="addExpenseBtn" class="btn-success">Ajouter</button><div id="expenseList"></div><div>Total: <strong id="totalExpenses">0</strong> USD</div></div>
+        </div>
+
+        <!-- Rapport du jour -->
+        <div id="compta-rapport" class="sub-panel">
+            <div class="card"><h3>📈 Situation financière</h3><div id="caisseSituation"></div><button id="sendManualReportBtn" class="btn-warning" style="margin-top:10px;">📨 Envoyer rapport promoteur & financier</button><div class="param-row"><span>⏰ Envoi auto à <strong>14h00</strong> (archivage automatique)</span></div></div>
+            <div class="card"><h3>📄 Rapport du jour</h3><div id="dailyReportPreview" class="professional-report"></div><button id="simulateAutoReportBtn" class="btn-secondary">🔍 Générer aperçu</button></div>
+        </div>
+
+        <!-- Archives -->
+        <div id="compta-archives" class="sub-panel">
+            <div class="card"><div class="flex-between"><h3>📊 RAPPORTS MENSUELS & ANNUELS</h3><div><button id="clearArchivesBtn" class="btn-danger">🗑️ Vider archives</button><button id="printArchivesBtn" class="btn-print">🖨️ Imprimer</button></div></div><div id="monthlyYearlyStats"></div><h3>📁 Rapports journaliers archivés</h3><div id="dailyArchivesList"></div></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function(){
+        // ---------- STOCKAGE ----------
+        let students=[], payments=[], logistics=[], staffMembers=[], individualPayrollRecords=[], archivedPayrollRecords=[], transports=[], otherExpenses=[], dailyReportsArchive=[], specialFees=[];
+        let exchangeRate=2500, defaultAnnualFees=350, promoteurPhone='', financierPhone='', appPassword=null;
+        const classList = ["1ère A2 Infirmière","2ème A2 Infirmière","3ème A2 Infirmière","4ème A2 Infirmière","1ère A2 Accoucheuse","2ème A2 Accoucheuse","3ème A2 Accoucheuse","4ème A2 Accoucheuse"];
+
+        function saveAll(){
+            localStorage.setItem('gestEduFinalV4', JSON.stringify({students,payments,logistics,staffMembers,individualPayrollRecords,archivedPayrollRecords,transports,otherExpenses,dailyReportsArchive,specialFees,exchangeRate,defaultAnnualFees,promoteurPhone,financierPhone}));
+            document.querySelector('.led').style.backgroundColor='#2ecc71';
+        }
+        function loadAll(){
+            let d=JSON.parse(localStorage.getItem('gestEduFinalV4')||'{}');
+            students=d.students||[]; payments=d.payments||[]; logistics=d.logistics||[]; staffMembers=d.staffMembers||[]; individualPayrollRecords=d.individualPayrollRecords||[]; archivedPayrollRecords=d.archivedPayrollRecords||[]; transports=d.transports||[]; otherExpenses=d.otherExpenses||[]; dailyReportsArchive=d.dailyReportsArchive||[]; specialFees=d.specialFees||[]; exchangeRate=d.exchangeRate||2500; defaultAnnualFees=d.defaultAnnualFees||350; promoteurPhone=d.promoteurPhone||''; financierPhone=d.financierPhone||'';
+        }
+        function convertToUSD(amount,curr){ return curr==='USD'? amount : amount/exchangeRate; }
+
+        // ---------- MOT DE PASSE ----------
+        function loadPassword(){ appPassword=localStorage.getItem('appPassword'); }
+        function savePassword(p){ appPassword=p; localStorage.setItem('appPassword',p); }
+        function requirePassword(cb){ appPassword? showPrompt(cb) : showCreate(cb); }
+        function showCreate(cb){ let m=document.createElement('div'); m.className='password-modal'; m.innerHTML=`<div class="password-box"><h3>Créer mot de passe</h3><input type="password" id="p1" placeholder="Mot de passe"><input type="password" id="p2" placeholder="Confirmer"><button id="savePwd" class="btn-success">Valider</button></div>`; document.body.appendChild(m); document.getElementById('savePwd').onclick=()=>{ let p1=document.getElementById('p1').value, p2=document.getElementById('p2').value; if(p1&&p1===p2){ savePassword(p1); m.remove(); cb(); } else alert("Mots de passe différents"); }; }
+        function showPrompt(cb){ let m=document.createElement('div'); m.className='password-modal'; m.innerHTML=`<div class="password-box"><h3>Accès sécurisé</h3><input type="password" id="pwd" placeholder="Mot de passe"><button id="checkPwd" class="btn-success">Valider</button></div>`; document.body.appendChild(m); document.getElementById('checkPwd').onclick=()=>{ if(document.getElementById('pwd').value===appPassword){ m.remove(); cb(); } else alert("Mot de passe incorrect"); }; }
+        function changePassword(){ let old=prompt("Ancien mot de passe"); if(old!==appPassword) return alert("Incorrect"); let n=prompt("Nouveau"); if(!n) return; let c=prompt("Confirmer"); if(n!==c) return alert("Différent"); savePassword(n); alert("Mot de passe modifié"); }
+
+        // ---------- UTILITAIRES ----------
+        function sendWhatsApp(phone,msg){ if(!phone)return; let clean=phone.replace(/\s/g,''); if(!clean.startsWith('+')) clean='+'+clean; window.open(`https://wa.me/${clean}?text=${encodeURIComponent(msg)}`,'_blank'); }
+        function showLoader(){ let l=document.getElementById('loaderOverlay'); l.classList.add('active'); setTimeout(()=>l.classList.remove('active'),500); }
+        function printWithHeader(title,content){ let w=window.open('','_blank'); w.document.write(`<html><head><title>${title}</title><style>body{font-family:sans-serif;padding:20px} table{border-collapse:collapse;width:100%} th,td{border:1px solid #ccc;padding:8px} th{background:#1e3c72;color:white}</style></head><body><h2>🏫 ITM SAINT GABRIEL</h2><h3>${title}</h3>${content}<p>${new Date().toLocaleDateString()}</p><button onclick="window.print();setTimeout(()=>window.close(),500)">Imprimer</button></body></html>`); w.document.close(); }
+
+        // ---------- CAMERA + FICHIER ----------
+        let camStream=null;
+        function stopCamera(){ if(camStream){ camStream.getTracks().forEach(t=>t.stop()); camStream=null; } let v=document.getElementById('cameraPreview'); if(v) v.srcObject=null; document.getElementById('capturePhotoBtn').disabled=true; }
+        async function startCamera(){ try { let stream = await navigator.mediaDevices.getUserMedia({video: {facingMode:'user'}, audio:false}); camStream=stream; let video=document.getElementById('cameraPreview'); video.srcObject=stream; document.getElementById('capturePhotoBtn').disabled=false; } catch(e) { alert("Accès caméra refusé. Utilisez le sélecteur de fichier."); } }
+        function capturePhoto(){ let v=document.getElementById('cameraPreview'), c=document.getElementById('cameraCanvas'), img=document.getElementById('photoPreview'), inp=document.getElementById('studentPhotoData'); c.width=v.videoWidth||320; c.height=v.videoHeight||240; c.getContext('2d').drawImage(v,0,0,c.width,c.height); let data=c.toDataURL('image/jpeg',0.8); inp.value=data; img.src=data; img.style.display='block'; }
+        function handleFileSelect(e){ let f=e.target.files[0]; if(f){ let r=new FileReader(); r.onload=ev=>{ document.getElementById('photoPreview').src=ev.target.result; document.getElementById('photoPreview').style.display='block'; document.getElementById('studentPhotoData').value=ev.target.result; }; r.readAsDataURL(f); } }
+
+        // ---------- RENDU ÉLÈVES ----------
+        function renderGroupedStudentList(){
+            let html='', total=0, totF=0, totP=0;
+            classList.forEach(cls=>{
+                let list=students.filter(s=>s.class===cls);
+                if(!list.length) return;
+                total+=list.length;
+                html+=`<div class="class-group"><div class="class-header"><span>📚 ${cls} (${list.length})</span><button class="print-class-btn" data-class="${cls}" style="background:#f9c74f;">🖨️</button></div><table><tr><th>N°</th><th>Nom</th><th>Sexe</th><th>Parent</th><th>Tél</th><th>Frais</th><th>Payé</th><th>Reste</th><th></th></tr>`;
+                list.forEach((s,i)=>{
+                    let frais=s.totalFees||defaultAnnualFees, paye=payments.filter(p=>p.studentId===s.id).reduce((a,p)=>a+p.amountUSD,0), reste=frais-paye;
+                    totF+=frais; totP+=paye;
+                    html+=`<tr><td>${i+1}</td><td>${s.name}</td><td>${s.sexe||'M'}</td><td>${s.parentName||'-'}</td><td>${s.parentPhone||'-'}</td><td>${frais.toFixed(2)}</td><td>${paye.toFixed(2)}</td><td style="color:${reste<0?'green':'red'}">${reste.toFixed(2)}</td><td><button class="edit-student" data-id="${s.id}">✏️</button><button class="del-student" data-id="${s.id}" style="background:#c44c4c;">🗑️</button></td></tr>`;
+                });
+                html+=`</table></div>`;
+            });
+            document.getElementById('groupedStudentList').innerHTML=html||'<p>Aucun élève.</p>';
+            document.getElementById('totalGeneralEffectif').innerHTML=`🏫 Effectif: ${total} | Frais: ${totF.toFixed(2)} USD | Payé: ${totP.toFixed(2)} USD | Solde: ${(totF-totP).toFixed(2)} USD`;
+            document.querySelectorAll('.del-student').forEach(b=>b.onclick=()=>{ if(confirm("Supprimer ?")){ students=students.filter(s=>s.id!=b.dataset.id); payments=payments.filter(p=>p.studentId!=b.dataset.id); saveAll(); renderAll(); }});
+            document.querySelectorAll('.edit-student').forEach(b=>b.onclick=()=>{ let s=students.find(s=>s.id==b.dataset.id); if(s) openEditStudentModal(s); });
+            document.querySelectorAll('.print-class-btn').forEach(b=>b.onclick=()=>{ let list=students.filter(s=>s.class===b.dataset.class); printWithHeader(b.dataset.class,`<table><tr><th>Nom</th><th>Sexe</th><th>Parent</th><th>Payé</th></tr>${list.map(s=>`<tr><td>${s.name}</td><td>${s.sexe}</td><td>${s.parentName}</td><td>${payments.filter(p=>p.studentId===s.id).reduce((a,p)=>a+p.amountUSD,0).toFixed(2)}</td></tr>`).join('')}</table>`); });
+        }
+        function openEditStudentModal(s){
+            let n=prompt("Nom",s.name); if(!n) return;
+            let sex=prompt("Sexe M/F",s.sexe);
+            let cls=prompt("Classe",s.class); if(!classList.includes(cls)) return alert("Classe invalide");
+            let pn=prompt("Parent",s.parentName), pp=prompt("Tél",s.parentPhone), f=prompt("Frais annuels USD",s.totalFees||'');
+            let upd={...s, name:n, sexe:sex, class:cls, parentName:pn, parentPhone:pp};
+            if(f&&!isNaN(parseFloat(f))) upd.totalFees=parseFloat(f); else delete upd.totalFees;
+            students=students.map(st=>st.id===s.id?upd:st);
+            saveAll(); renderAll();
+        }
+
+        // ---------- PERSONNEL (deux tableaux) ----------
+        function renderStaffTables(){
+            let admins=staffMembers.filter(s=>s.type==='admin'), facs=staffMembers.filter(s=>s.type==='facilitateur');
+            document.getElementById('adminStaffTable').innerHTML=admins.length?`<table><tr><th>Nom</th><th>Fonction</th><th>Tél</th><th>Salaire USD</th><th></th></tr>${admins.map(s=>`<tr><td>${s.name}</td><td>${s.role||'-'}</td><td>${s.phone||'-'}</td><td>${s.salary||0}</td><td><button class="delStaff" data-id="${s.id}" style="background:#c44c4c;">🗑️</button></td></tr>`).join('')}</table>`:'<p>Aucun administratif</p>';
+            document.getElementById('facilitateurStaffTable').innerHTML=facs.length?`<table><tr><th>Nom</th><th>Fonction</th><th>Tél</th><th>Taux horaire CDF</th><th></th></tr>${facs.map(s=>`<tr><td>${s.name}</td><td>${s.role||'-'}</td><td>${s.phone||'-'}</td><td>${s.hourlyRate||0}</td><td><button class="delStaff" data-id="${s.id}" style="background:#c44c4c;">🗑️</button></td></tr>`).join('')}</table>`:'<p>Aucun facilitateur</p>';
+            document.querySelectorAll('.delStaff').forEach(b=>b.onclick=()=>{ staffMembers=staffMembers.filter(s=>s.id!=b.dataset.id); individualPayrollRecords=individualPayrollRecords.filter(r=>staffMembers.some(s=>s.id===r.staffId)); archivedPayrollRecords=archivedPayrollRecords.filter(r=>staffMembers.some(s=>s.id===r.staffId)); saveAll(); renderAll(); });
+        }
+
+        // ---------- PAIEMENT PERSONNEL (deux tableaux séparés) ----------
+        function renderPayrollByType(type, containerId){
+            let currentMonth=new Date().toISOString().slice(0,7);
+            let staffList=staffMembers.filter(s=>s.type===type);
+            let activeRecs=individualPayrollRecords.filter(r=>r.month===currentMonth && !r.archived && staffList.some(s=>s.id===r.staffId));
+            let html='<table><tr><th>Nom</th><th>Base</th><th>'+(type==='facilitateur'?'Heures':'')+'</th><th>Avance</th><th>Net</th><th>Payé?</th><th>Actions</th></tr>';
+            staffList.forEach(staff=>{
+                let rec=activeRecs.find(r=>r.staffId===staff.id);
+                let isPaid=!!rec;
+                let base=type==='admin'? (staff.salary||0)+' USD' : (staff.hourlyRate||0)+' CDF/h';
+                let heures=type==='facilitateur'? (rec?rec.heures:0) : 0;
+                let brut=type==='admin'? (staff.salary||0) : (staff.hourlyRate||0)*heures;
+                let avance=rec?rec.avance:0;
+                let net=brut-avance;
+                html+=`<tr><td>${staff.name}</td><td>${base}</td>
+                    ${type==='facilitateur'?`<td><input type="number" id="heures_${staff.id}" value="${heures}" step="0.5" style="width:80px" ${isPaid?'disabled':''}></td>`:'<td>-</td>'}
+                    <td><input type="number" id="avance_${staff.id}" value="${avance}" style="width:80px" ${isPaid?'disabled':''}></td>
+                    <td class="net-${staff.id}">${net.toFixed(2)} ${type==='admin'?'USD':'CDF'}</td>
+                    <td>${isPaid?'✅ Payé':`<input type="checkbox" class="pay-check" data-id="${staff.id}" data-type="${type}">`}</td>
+                    <td>${isPaid?`<button class="bulletinBtn" data-id="${staff.id}" data-month="${currentMonth}">📄</button><button class="archivePayBtn" data-id="${staff.id}" data-month="${currentMonth}">📦</button><button class="deletePayBtn" data-id="${staff.id}" data-month="${currentMonth}" style="background:#c44c4c;">🗑️</button>`:'--'}</td>
+                </tr>`;
+                if(type==='facilitateur') document.getElementById(`heures_${staff.id}`)?.addEventListener('input',()=>updateNet(staff, type));
+                document.getElementById(`avance_${staff.id}`)?.addEventListener('input',()=>updateNet(staff, type));
+            });
+            html+='</table><button class="bulkPayBtn" data-type="'+type+'" class="btn-success">✅ Payer sélectionnés</button>';
+            document.getElementById(containerId).innerHTML=html;
+            document.querySelector(`#${containerId} .bulkPayBtn`).onclick=()=>processBulkPay(type);
+        }
+        function updateNet(staff, type){
+            let avance=parseFloat(document.getElementById(`avance_${staff.id}`)?.value)||0;
+            let brut=type==='admin'? (staff.salary||0) : (staff.hourlyRate||0)*(parseFloat(document.getElementById(`heures_${staff.id}`)?.value)||0);
+            let net=brut-avance;
+            let cell=document.querySelector(`.net-${staff.id}`); if(cell) cell.innerText=`${net.toFixed(2)} ${type==='admin'?'USD':'CDF'}`;
+        }
+        function processBulkPay(type){
+            let currentMonth=new Date().toISOString().slice(0,7);
+            document.querySelectorAll(`.pay-check[data-type="${type}"]:checked`).forEach(cb=>{
+                let staffId=parseInt(cb.dataset.id);
+                let staff=staffMembers.find(s=>s.id===staffId);
+                if(!staff||individualPayrollRecords.find(r=>r.staffId===staffId&&r.month===currentMonth&&!r.archived)) return;
+                let avance=parseFloat(document.getElementById(`avance_${staffId}`)?.value)||0;
+                let heures=type==='facilitateur'? parseFloat(document.getElementById(`heures_${staffId}`)?.value)||0:0;
+                let brut=type==='admin'? staff.salary : staff.hourlyRate*heures;
+                individualPayrollRecords.push({staffId,month:currentMonth,brut,avance,net:brut-avance,heures,paidDate:new Date().toISOString().slice(0,10),archived:false, staffType:type});
+            });
+            saveAll(); renderAll();
+        }
+        function renderPayrolls(){
+            renderPayrollByType('admin','adminPayrollContainer');
+            renderPayrollByType('facilitateur','facilitateurPayrollContainer');
+            document.querySelectorAll('.bulletinBtn').forEach(b=>b.onclick=()=>showBulletin(parseInt(b.dataset.id),b.dataset.month));
+            document.querySelectorAll('.archivePayBtn').forEach(b=>b.onclick=()=>{
+                let staffId=parseInt(b.dataset.id), month=b.dataset.month;
+                let idx=individualPayrollRecords.findIndex(r=>r.staffId===staffId&&r.month===month&&!r.archived);
+                if(idx!==-1){ let rec=individualPayrollRecords[idx]; rec.archived=true; archivedPayrollRecords.push(rec); individualPayrollRecords.splice(idx,1); saveAll(); renderAll(); }
+            });
+            document.querySelectorAll('.deletePayBtn').forEach(b=>b.onclick=()=>{
+                let staffId=parseInt(b.dataset.id), month=b.dataset.month;
+                individualPayrollRecords=individualPayrollRecords.filter(r=>!(r.staffId===staffId&&r.month===month&&!r.archived));
+                archivedPayrollRecords=archivedPayrollRecords.filter(r=>!(r.staffId===staffId&&r.month===month));
+                saveAll(); renderAll();
+            });
+            let archContainer=document.getElementById('archivedPayrollContainer');
+            archContainer.innerHTML=archivedPayrollRecords.length?`<table><tr><th>Nom</th><th>Mois</th><th>Net</th><th>Date</th></tr>${archivedPayrollRecords.map(r=>{ let s=staffMembers.find(st=>st.id===r.staffId); return `<tr><td>${s?.name||'?'}</td><td>${r.month}</td><td>${r.net.toFixed(2)} ${s?.type==='admin'?'USD':'CDF'}</td><td>${r.paidDate}</td></tr>`; }).join('')}</table>`:'<p>Aucune archive</p>';
+        }
+        function showBulletin(staffId,month){
+            let rec=individualPayrollRecords.find(r=>r.staffId===staffId&&r.month===month&&!r.archived)||archivedPayrollRecords.find(r=>r.staffId===staffId&&r.month===month);
+            let staff=staffMembers.find(s=>s.id===staffId); if(!rec||!staff) return;
+            let modal=document.createElement('div'); modal.className='modal-bulletin';
+            modal.innerHTML=`<div class="modal-bulletin-content"><div class="bulletin-card"><h2>🏫 ITM SAINT GABRIEL</h2><h3>BULLETIN DE PAIE</h3><p>Mois: ${month} · ${staff.name} · ${staff.role||''}</p><table><tr><th>Désignation</th><th>Montant</th></tr><tr><td>Brut</td><td>${rec.brut.toFixed(2)} ${staff.type==='admin'?'USD':'CDF'}</td></tr><tr><td>Avance</td><td>${rec.avance.toFixed(2)}</td></tr><tr><td><strong>NET</strong></td><td><strong>${rec.net.toFixed(2)} ${staff.type==='admin'?'USD':'CDF'}</strong></td></tr></table><div class="sign-line"><span>Date: ${rec.paidDate}</span><span>Signature</span></div></div><div class="flex-between"><button class="printBulletin">🖨️ Imprimer</button><button class="whatsappBulletin">📲 WhatsApp</button><button class="closeModal">Fermer</button></div></div>`;
+            document.body.appendChild(modal);
+            modal.querySelector('.closeModal').onclick=()=>modal.remove();
+            modal.querySelector('.printBulletin').onclick=()=>printWithHeader(`Bulletin ${staff.name}`, modal.querySelector('.bulletin-card').innerHTML);
+            modal.querySelector('.whatsappBulletin').onclick=()=>{ if(staff.phone) sendWhatsApp(staff.phone, `🏫 ITM SAINT GABRIEL\nBULLETIN DE PAIE ${month}\n${staff.name}\nNet: ${rec.net.toFixed(2)} ${staff.type==='admin'?'USD':'CDF'}`); };
+        }
+
+        // ---------- PAIEMENT ÉLÈVES ----------
+        function renderPaymentHistory(){
+            let html='<table><tr><th>Date</th><th>Élève</th><th>USD</th><th>Rubrique</th><th></th></tr>';
+            payments.slice().reverse().forEach(p=>{ let s=students.find(st=>st.id===p.studentId); html+=`<tr><td>${p.date}</td><td>${s?.name||'?'}</td><td>${p.amountUSD.toFixed(2)}</td><td>${p.description||'-'}</td><td><button class="delPay" data-id="${p.id}">🗑️</button></td></tr>`; });
+            document.getElementById('paymentHistoryList').innerHTML=html;
+            document.querySelectorAll('.delPay').forEach(b=>b.onclick=()=>{ payments=payments.filter(p=>p.id!=b.dataset.id); saveAll(); renderAll(); });
+        }
+        function renderPaymentClassFilter(){
+            let cls=document.getElementById('paymentClassSelect').value;
+            let term=document.getElementById('searchStudent').value.toLowerCase();
+            let filtered=students.filter(s=>(!cls||s.class===cls) && s.name.toLowerCase().includes(term));
+            document.getElementById('paymentStudentSelect').innerHTML=filtered.map(s=>`<option value="${s.id}">${s.name} - ${s.class}</option>`).join('');
+        }
+
+        // ---------- FRAIS SPÉCIAUX ----------
+        function renderSpecialFees(){
+            let html='<table><tr><th>Date</th><th>Élève</th><th>Type</th><th>Montant</th><th>Devise</th><th>Description</th><th></th></tr>';
+            specialFees.forEach(f=>{ let s=students.find(st=>st.id===f.studentId); html+=`<tr><td>${f.date}</td><td>${s?.name||'?'}</td><td>${f.type}</td><td>${f.amount.toFixed(2)}</td><td>${f.currency}</td><td>${f.desc||''}</td><td><button class="delSpecial" data-id="${f.id}">🗑️</button></td></tr>`; });
+            document.getElementById('specialFeesHistory').innerHTML=html||'<p>Aucun frais spécifique</p>';
+            document.querySelectorAll('.delSpecial').forEach(b=>b.onclick=()=>{ specialFees=specialFees.filter(f=>f.id!=b.dataset.id); saveAll(); renderAll(); });
+            let select=document.getElementById('specialFeeStudentSelect');
+            select.innerHTML=students.map(s=>`<option value="${s.id}">${s.name} (${s.class})</option>`).join('');
+        }
+
+        // ---------- DÉPENSES, CAISSE, RAPPORT ----------
+        function renderLogistics(){ let html=''; logistics.forEach((l,i)=>html+=`<tr><td>${l.item}</td><td>${l.type}</td><td>${l.qty}</td><td>${l.price}</td><td>${(l.qty*l.price).toFixed(2)}</td><td><button class="delLog" data-idx="${i}">🗑️</button></td></tr>`); document.getElementById('logisticsList').innerHTML=`<table><tr><th>Article</th><th>Type</th><th>Qté</th><th>Prix</th><th>Total</th><th></th></tr>${html}</table>`; document.querySelectorAll('.delLog').forEach(b=>b.onclick=()=>{ logistics.splice(b.dataset.idx,1); saveAll(); renderAll(); }); let stock={}; logistics.forEach(l=>{ stock[l.item]=(stock[l.item]||0)+(l.type==='ENTREE'?l.qty:-l.qty); }); document.getElementById('stockSummary').innerHTML=Object.keys(stock).length?`<table><tr><th>Article</th><th>Stock</th></tr>${Object.entries(stock).map(([k,v])=>`<tr><td>${k}</td><td>${v}</td></tr>`).join('')}</table>`:'<p>Stock vide</p>'; }
+        function renderTransportList(){ let html=''; transports.forEach((t,i)=>html+=`<tr><td>${t.date}</td><td>${t.name}</td><td>${t.amountUSD.toFixed(2)}</td><td><button class="delTrans" data-idx="${i}">🗑️</button></td></tr>`); document.getElementById('transportList').innerHTML=`<table><tr><th>Date</th><th>Nom</th><th>USD</th><th></th></tr>${html}</table>`; document.querySelectorAll('.delTrans').forEach(b=>b.onclick=()=>{ transports.splice(b.dataset.idx,1); saveAll(); renderAll(); }); document.getElementById('totalTransports').innerText=transports.reduce((s,t)=>s+t.amountUSD,0).toFixed(2); }
+        function renderExpenseList(){ let html=''; otherExpenses.forEach((e,i)=>html+=`<tr><td>${e.date}</td><td>${e.motif}</td><td>${e.amountUSD.toFixed(2)}</td><td><button class="delExp" data-idx="${i}">🗑️</button></td></tr>`); document.getElementById('expenseList').innerHTML=`<table><tr><th>Date</th><th>Motif</th><th>USD</th><th></th></tr>${html}</table>`; document.querySelectorAll('.delExp').forEach(b=>b.onclick=()=>{ otherExpenses.splice(b.dataset.idx,1); saveAll(); renderAll(); }); document.getElementById('totalExpenses').innerText=otherExpenses.reduce((s,e)=>s+e.amountUSD,0).toFixed(2); }
+        function renderCaisseSituation(){
+            let entrees=payments.reduce((s,p)=>s+p.amountUSD,0);
+            let sorties=logistics.filter(l=>l.type==='SORTIE').reduce((s,l)=>s+l.qty*l.price,0) + individualPayrollRecords.filter(r=>!r.archived).reduce((s,r)=>s+(r.staffType==='admin'?r.net:r.net/exchangeRate),0) + transports.reduce((s,t)=>s+t.amountUSD,0) + otherExpenses.reduce((s,e)=>s+e.amountUSD,0);
+            document.getElementById('caisseSituation').innerHTML=`<table><tr><th>Entrées USD</th><td>${entrees.toFixed(2)}</td></tr><tr><th>Sorties USD</th><td>${sorties.toFixed(2)}</td></tr><tr><th>Solde</th><td>${(entrees-sorties).toFixed(2)} USD</td></tr></table>`;
+        }
+        function generateDailyReport(){
+            let today=new Date().toISOString().slice(0,10);
+            let pToday=payments.filter(p=>p.date===today);
+            let eToday=otherExpenses.filter(e=>e.date===today);
+            let tToday=transports.filter(t=>t.date===today);
+            let entrees=pToday.reduce((s,p)=>s+p.amountUSD,0);
+            let sorties=eToday.reduce((s,e)=>s+e.amountUSD,0)+tToday.reduce((s,t)=>s+t.amountUSD,0);
+            let totalEntrees=payments.reduce((s,p)=>s+p.amountUSD,0);
+            let totalSorties=logistics.filter(l=>l.type==='SORTIE').reduce((s,l)=>s+l.qty*l.price,0) + individualPayrollRecords.filter(r=>!r.archived).reduce((s,r)=>s+(r.staffType==='admin'?r.net:r.net/exchangeRate),0) + transports.reduce((s,t)=>s+t.amountUSD,0) + otherExpenses.reduce((s,e)=>s+e.amountUSD,0);
+            return `🏫 ITM SAINT GABRIEL · RAPPORT JOURNALIER ${today}\n\n💰 ENTRÉES DU JOUR: ${entrees.toFixed(2)} USD (${pToday.length} opérations)\n📤 SORTIES DU JOUR: ${sorties.toFixed(2)} USD\n   - Dépenses: ${eToday.length} · Transport: ${tToday.length}\n\n📊 SITUATION GLOBALE\n   Total entrées: ${totalEntrees.toFixed(2)} USD\n   Total sorties: ${totalSorties.toFixed(2)} USD\n   SOLDE CAISSE: ${(totalEntrees-totalSorties).toFixed(2)} USD\n\n📌 Détails par catégorie disponibles dans l'application.`;
+        }
+        function archiveDailyReport(){
+            let today=new Date().toISOString().slice(0,10);
+            if(dailyReportsArchive.some(r=>r.date===today)) return;
+            dailyReportsArchive.unshift({date:today, content:generateDailyReport()});
+            if(dailyReportsArchive.length>365) dailyReportsArchive.pop();
+            saveAll(); renderArchives();
+        }
+        function renderArchives(){
+            let archDiv=document.getElementById('dailyArchivesList');
+            archDiv.innerHTML=dailyReportsArchive.length?dailyReportsArchive.map(a=>`<div><strong>${a.date}</strong><pre style="white-space:pre-wrap;">${a.content}</pre></div>`).join(''):'<p>Aucun rapport archivé</p>';
+            let months={};
+            dailyReportsArchive.forEach(r=>{ let m=r.date.slice(0,7); if(!months[m]) months[m]={entree:0,sortie:0}; let e=r.content.match(/ENTRÉES DU JOUR: ([\d\.]+)/); let s=r.content.match(/SORTIES DU JOUR: ([\d\.]+)/); if(e) months[m].entree+=parseFloat(e[1]); if(s) months[m].sortie+=parseFloat(s[1]); });
+            let monthlyHtml='<table><tr><th>Mois</th><th>Entrées</th><th>Sorties</th><th>Solde</th></tr>';
+            Object.entries(months).forEach(([m,d])=>{ monthlyHtml+=`<tr><td>${m}</td><td>${d.entree.toFixed(2)}</td><td>${d.sortie.toFixed(2)}</td><td>${(d.entree-d.sortie).toFixed(2)}</td></tr>`; });
+            document.getElementById('monthlyYearlyStats').innerHTML=monthlyHtml+'</table>';
+        }
+
+        function renderAll(){
+            renderGroupedStudentList();
+            renderPaymentClassFilter();
+            renderPaymentHistory();
+            renderLogistics(); renderTransportList(); renderExpenseList(); renderCaisseSituation();
+            renderStaffTables(); renderPayrolls(); renderSpecialFees(); renderArchives();
+            document.getElementById('exchangeRateInput').value=exchangeRate;
+            document.getElementById('defaultAnnualFees').value=defaultAnnualFees;
+            document.getElementById('globalPromoteurPhone').value=promoteurPhone;
+            document.getElementById('globalFinancierPhone').value=financierPhone;
+            document.getElementById('dailyReportPreview').innerHTML=generateDailyReport().replace(/\n/g,'<br>');
+            let paySelect=document.getElementById('paymentClassSelect'); paySelect.innerHTML='<option value="">Toutes classes</option>'+classList.map(c=>`<option>${c}</option>`).join('');
+            let classSelect=document.getElementById('studentClass'); if(classSelect) classSelect.innerHTML='<option value="">Sélectionner</option>'+classList.map(c=>`<option>${c}</option>`).join('');
+        }
+
+        // ---------- INIT EVENTS ----------
+        function bindEvents(){
+            document.getElementById('openAddStudentFormBtn').onclick=()=>{ document.getElementById('studentFormContainer').style.display='block'; stopCamera(); };
+            document.getElementById('cancelStudentFormBtn').onclick=()=>{ document.getElementById('studentFormContainer').style.display='none'; stopCamera(); };
+            document.getElementById('startCameraBtn').onclick=startCamera;
+            document.getElementById('capturePhotoBtn').onclick=capturePhoto;
+            document.getElementById('photoFileInput').onchange=handleFileSelect;
+            document.querySelector('label.btn-secondary').addEventListener('click',()=>document.getElementById('photoFileInput').click());
+            document.getElementById('saveStudentBtn').onclick=()=>{
+                let name=document.getElementById('studentName').value.trim(); if(!name) return alert("Nom requis");
+                let sexe=document.getElementById('studentSexe').value, cls=document.getElementById('studentClass').value; if(!cls) return alert("Classe requise");
+                let parent=document.getElementById('studentParentName').value, phone=document.getElementById('studentParentPhone').value;
+                let fees=document.getElementById('studentCustomFees').value; let totalFees=fees?parseFloat(fees):null;
+                let photo=document.getElementById('studentPhotoData').value;
+                students.push({id:Date.now(), name, sexe, class:cls, parentName:parent, parentPhone:phone, totalFees, photo});
+                saveAll(); renderAll();
+                document.getElementById('studentFormContainer').style.display='none'; stopCamera();
+                document.getElementById('studentName').value=''; document.getElementById('studentParentName').value=''; document.getElementById('studentParentPhone').value=''; document.getElementById('studentCustomFees').value=''; document.getElementById('studentClass').value=''; document.getElementById('photoPreview').style.display='none'; document.getElementById('studentPhotoData').value='';
+            };
+            document.getElementById('changePasswordBtn').onclick=changePassword;
+            document.getElementById('openAddStaffBtn').onclick=()=>document.getElementById('addStaffForm').style.display='grid';
+            document.getElementById('cancelStaffBtn').onclick=()=>document.getElementById('addStaffForm').style.display='none';
+            document.getElementById('staffType').onchange=e=>{ let admin=e.target.value==='admin'; document.getElementById('staffSalaryField').style.display=admin?'block':'none'; document.getElementById('staffHourlyRateField').style.display=admin?'none':'block'; };
+            document.getElementById('saveStaffBtn').onclick=()=>{
+                let name=document.getElementById('staffName').value; if(!name) return alert("Nom requis");
+                let type=document.getElementById('staffType').value, role=document.getElementById('staffRole').value, phone=document.getElementById('staffPhone').value;
+                let staff={id:Date.now(), name, type, role, phone};
+                if(type==='admin') staff.salary=parseFloat(document.getElementById('staffSalary').value)||0;
+                else staff.hourlyRate=parseFloat(document.getElementById('staffHourlyRate').value)||0;
+                staffMembers.push(staff); saveAll(); renderAll(); document.getElementById('addStaffForm').style.display='none';
+            };
+            document.getElementById('recordPaymentBtn').onclick=()=>{
+                let sid=parseInt(document.getElementById('paymentStudentSelect').value); if(!sid) return alert("Sélectionnez élève");
+                let amt=parseFloat(document.getElementById('paymentAmountLocal').value); if(isNaN(amt)) return;
+                let curr=document.getElementById('currencyType').value, date=document.getElementById('paymentDate').value||new Date().toISOString().slice(0,10);
+                let desc=document.getElementById('paymentDesc').value;
+                payments.push({id:Date.now(), studentId:sid, amountLocal:amt, currency:curr, amountUSD:convertToUSD(amt,curr), date, description:desc});
+                saveAll(); renderAll();
+            };
+            document.getElementById('sendPaymentWhatsAppBtn').onclick=()=>{
+                let sid=parseInt(document.getElementById('paymentStudentSelect').value); let s=students.find(s=>s.id===sid);
+                if(s&&s.parentPhone) sendWhatsApp(s.parentPhone, `🏫 ITM SAINT GABRIEL\nPaiement reçu: ${document.getElementById('paymentAmountLocal').value} ${document.getElementById('currencyType').value}\n${document.getElementById('paymentDesc').value}\nMerci.`);
+            };
+            document.getElementById('printPaymentReceiptBtn').onclick=()=>printWithHeader('Reçu', `<p>Montant: ${document.getElementById('paymentAmountLocal').value} ${document.getElementById('currencyType').value}</p>`);
+            document.getElementById('printPaymentsHistoryBtn').onclick=()=>printWithHeader('Historique paiements', document.getElementById('paymentHistoryList').innerHTML);
+            document.getElementById('recordSpecialFeeBtn').onclick=()=>{
+                let sid=parseInt(document.getElementById('specialFeeStudentSelect').value); if(!sid) return;
+                let type=document.getElementById('specialFeeType').value, amt=parseFloat(document.getElementById('specialFeeAmount').value); if(isNaN(amt)) return;
+                let curr=document.getElementById('specialFeeCurrency').value, date=document.getElementById('specialFeeDate').value||new Date().toISOString().slice(0,10), desc=document.getElementById('specialFeeDesc').value;
+                specialFees.push({id:Date.now(), studentId:sid, type, amount:amt, currency:curr, date, desc});
+                saveAll(); renderAll();
+            };
+            document.getElementById('saveExchangeRateBtn').onclick=()=>{ let v=parseFloat(document.getElementById('exchangeRateInput').value); if(v>0){ exchangeRate=v; saveAll(); renderAll(); } };
+            document.getElementById('saveDefaultFeesBtn').onclick=()=>{ let v=parseFloat(document.getElementById('defaultAnnualFees').value); if(v>0){ defaultAnnualFees=v; saveAll(); renderAll(); } };
+            document.getElementById('savePromoteurPhoneBtn').onclick=()=>{ promoteurPhone=document.getElementById('globalPromoteurPhone').value; saveAll(); };
+            document.getElementById('saveFinancierPhoneBtn').onclick=()=>{ financierPhone=document.getElementById('globalFinancierPhone').value; saveAll(); };
+            document.getElementById('testPromoteurMsgBtn').onclick=()=>{ if(promoteurPhone) sendWhatsApp(promoteurPhone, "🏫 ITM SAINT GABRIEL - Test de connexion."); else alert("Numéro manquant"); };
+            document.getElementById('testFinancierMsgBtn').onclick=()=>{ if(financierPhone) sendWhatsApp(financierPhone, "🏫 ITM SAINT GABRIEL - Test de connexion."); else alert("Numéro manquant"); };
+            document.getElementById('sendManualReportBtn').onclick=()=>{ let report=generateDailyReport(); if(promoteurPhone) sendWhatsApp(promoteurPhone, report); if(financierPhone) sendWhatsApp(financierPhone, report); archiveDailyReport(); };
+            document.getElementById('simulateAutoReportBtn').onclick=()=>document.getElementById('dailyReportPreview').innerHTML=generateDailyReport().replace(/\n/g,'<br>');
+            document.getElementById('refreshAdminPayrollBtn').onclick=()=>renderPayrollByType('admin','adminPayrollContainer');
+            document.getElementById('refreshFacilitateurPayrollBtn').onclick=()=>renderPayrollByType('facilitateur','facilitateurPayrollContainer');
+            document.getElementById('printPayrollListBtn').onclick=()=>printWithHeader('Paiements personnel', document.getElementById('adminPayrollContainer').innerHTML + document.getElementById('facilitateurPayrollContainer').innerHTML);
+            document.getElementById('printAllClassesBtn').onclick=()=>{ let all=''; classList.forEach(cls=>{ let list=students.filter(s=>s.class===cls); if(list.length) all+=`<h3>${cls}</h3><table><tr><th>Nom</th><th>Sexe</th><th>Payé</th></tr>${list.map(s=>`<tr><td>${s.name}</td><td>${s.sexe}</td><td>${payments.filter(p=>p.studentId===s.id).reduce((a,p)=>a+p.amountUSD,0).toFixed(2)}</td></tr>`).join('')}</table>`; }); printWithHeader('Tous les effectifs', all); };
+            document.getElementById('printStaffListBtn').onclick=()=>printWithHeader('Liste du personnel', document.getElementById('adminStaffTable').innerHTML + document.getElementById('facilitateurStaffTable').innerHTML);
+            document.getElementById('paymentClassSelect').onchange=renderPaymentClassFilter;
+            document.getElementById('searchStudent').oninput=renderPaymentClassFilter;
+            document.getElementById('addLogBtn').onclick=()=>{ let item=document.getElementById('logItem').value, type=document.getElementById('logType').value, qty=parseInt(document.getElementById('logQty').value), price=parseFloat(document.getElementById('logPrice').value); if(item&&qty){ logistics.push({item,type,qty,price,date:new Date().toISOString().slice(0,10)}); saveAll(); renderAll(); } };
+            document.getElementById('addTransportBtn').onclick=()=>{ let name=document.getElementById('transportName').value, curr=document.getElementById('transportCurrency').value, amt=parseFloat(document.getElementById('transportAmount').value); if(name&&amt){ transports.push({name,amount:amt,currency:curr,amountUSD:convertToUSD(amt,curr),date:document.getElementById('transportDate').value||new Date().toISOString().slice(0,10)}); saveAll(); renderAll(); } };
+            document.getElementById('addExpenseBtn').onclick=()=>{ let motif=document.getElementById('expenseMotif').value, curr=document.getElementById('expenseCurrency').value, amt=parseFloat(document.getElementById('expenseAmount').value); if(motif&&amt){ otherExpenses.push({motif,amount:amt,currency:curr,amountUSD:convertToUSD(amt,curr),date:document.getElementById('expenseDate').value||new Date().toISOString().slice(0,10)}); saveAll(); renderAll(); } };
+            document.getElementById('clearArchivesBtn').onclick=()=>{ if(confirm("Vider archives ?")){ dailyReportsArchive=[]; saveAll(); renderAll(); } };
+            document.getElementById('printArchivesBtn').onclick=()=>printWithHeader('Archives', dailyReportsArchive.map(a=>`<h4>${a.date}</h4><pre>${a.content}</pre>`).join(''));
+            document.getElementById('currencyType').onchange=()=>{ let amt=parseFloat(document.getElementById('paymentAmountLocal').value); if(amt) document.getElementById('conversionPreview').innerText=`≈ ${convertToUSD(amt,document.getElementById('currencyType').value).toFixed(2)} USD`; };
+        }
+
+        // DÉMARRAGE
+        loadPassword(); loadAll();
+        document.getElementById('enterAppBtn').onclick=()=>{ requirePassword(()=>{ showLoader(); setTimeout(()=>{ document.getElementById('splashScreen').style.display='none'; document.getElementById('appContainer').style.display='block'; renderAll(); bindEvents(); },500); }); };
+        document.getElementById('exitAppBtn').onclick=()=>{ showLoader(); setTimeout(()=>{ document.getElementById('appContainer').style.display='none'; document.getElementById('splashScreen').style.display='flex'; },500); };
+        setInterval(saveAll,4000);
+        setInterval(()=>{ let d=new Date(); if(d.getHours()===14&&d.getMinutes()===0){ let report=generateDailyReport(); if(promoteurPhone) sendWhatsApp(promoteurPhone, report); if(financierPhone) sendWhatsApp(financierPhone, report); archiveDailyReport(); } },60000);
+        document.querySelectorAll('.sub-tab-btn').forEach(b=>b.onclick=()=>{ document.querySelectorAll('.sub-tab-btn').forEach(bt=>bt.classList.remove('active')); b.classList.add('active'); document.querySelectorAll('.sub-panel').forEach(p=>p.classList.remove('active-sub')); document.getElementById(b.dataset.sub).classList.add('active-sub'); if(b.dataset.sub==='compta-paiement-personnel') renderPayrolls(); });
+    })();
+</script>
+</body>
+</html>
